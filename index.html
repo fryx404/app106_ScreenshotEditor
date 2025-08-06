@@ -3,123 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>スクリーンショット テキスト編集ツール</title>
+<title>スクリーンショットにテキストを追加するツール</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>スクリーンショット テキスト編集ツール</h1>
+            <h1>スクリーンショットにテキストを追加するツール</h1>
+            <div class="controls">
+                <button id="paste-btn">クリップボードから貼り付け</button>
+                <input type="file" id="file-input" accept="image/*">
+                <label for="file-input" class="file-label">画像ファイルを選択</label>
+                <button id="clear-all-btn">全テキスト削除</button>
+                <button id="delete-selected-btn">選択テキスト削除</button>
+                <button id="save-btn">画像を保存</button>
+            </div>
         </header>
         
-        <div class="toolbar">
-            <!-- 画像読み込みグループ -->
-            <div class="import-group">
-                <button id="paste-btn" class="btn btn-primary" title="Ctrl+V または クリック">
-                    📋 ペースト
-                </button>
-                <button id="upload-btn" class="btn btn-info">
-                    📁 ファイル選択
-                </button>
-            </div>
-            
-            <!-- アンドゥ/リドゥ/クリアグループ -->
-            <div class="history-group">
-                <button id="undo-btn" class="btn btn-secondary" title="元に戻す (Ctrl+Z)">
-                    ↶ 元に戻す
-                </button>
-                <button id="redo-btn" class="btn btn-secondary" title="やり直し (Ctrl+Y)">
-                    ↷ やり直し
-                </button>
-                <button id="clear-text-btn" class="btn btn-warning" title="テキストクリア">
-                    📝 テキストクリア
-                </button>
-                <button id="clear-btn" class="btn btn-warning" title="全てクリア">
-                    🗑️ クリア
-                </button>
-            </div>
-            
-            <!-- ツールグループ -->
-            <div class="tool-group">
-                <button id="text-btn" class="btn tool-btn active" data-tool="text">
-                    📝 テキスト
-                </button>
-                <button id="move-btn" class="btn tool-btn" data-tool="move">
-                    🤚 移動
-                </button>
-            </div>
-            
-
-            
-            <!-- テキスト設定 -->
-            <div class="text-settings">
-                <div class="text-row">
-                    <label for="text-color">文字色:</label>
-                    <input type="color" id="text-color" value="#000000">
-                    
-                    <label for="font-size">サイズ:</label>
-                    <input type="number" id="font-size" min="8" max="200" value="100">
-                    <span id="font-size-unit">px</span>
-                </div>
-                
-                <div class="text-row">
-                    <label for="font-family">フォント:</label>
-                    <select id="font-family">
-                        <option value="Arial">Arial</option>
-                        <option value="Helvetica">Helvetica</option>
-                        <option value="Times New Roman">Times New Roman</option>
-                        <option value="Georgia">Georgia</option>
-                        <option value="Verdana">Verdana</option>
-                        <option value="Comic Sans MS">Comic Sans MS</option>
-                        <option value="Impact">Impact</option>
-                        <option value="Courier New">Courier New</option>
-                    </select>
-                    
-                    <div class="text-style-buttons">
-                        <button id="bold-btn" class="btn btn-mini" title="太字">B</button>
-                        <button id="italic-btn" class="btn btn-mini" title="斜体">I</button>
+        <main>
+            <div id="text-input-container">
+                <textarea id="text-input" placeholder="テキストを入力してください（Enterで改行）"></textarea>
+                <div class="text-options">
+                    <div class="option-group">
+                        <label for="font-size-input">文字サイズ:</label>
+                        <input type="number" id="font-size-input" min="10" max="200" value="80">px
+                    </div>
+                    <div class="option-group">
+                        <label for="text-color">文字色:</label>
+                        <input type="color" id="text-color" value="#ffffff">
+                    </div>
+                    <div class="option-group">
+                        <label for="bg-color">背景色:</label>
+                        <input type="color" id="bg-color" value="#000000">
+                    </div>
+                    <div class="option-group">
+                        <button id="reset-defaults-btn">デフォルト設定に戻す</button>
                     </div>
                 </div>
-                
-                <div class="text-row">
-                    <label for="text-input">テキスト:</label>
-                    <input type="text" id="text-input" placeholder="入力するテキスト">
+                <div class="text-controls">
+                    <button id="apply-text-btn">テキストを追加</button>
+                    <button id="cancel-text-btn">キャンセル</button>
                 </div>
             </div>
             
-
-            
-            <!-- アクションボタン -->
-            <div class="action-group">
-                <button id="save-btn" class="btn btn-success">
-                    💾 保存
-                </button>
-            </div>
-        </div>
-        
-        <div class="canvas-container">
-            <canvas id="main-canvas"></canvas>
-            <div id="selection-overlay" class="selection-overlay"></div>
-            <div id="status-message">
-                <div class="status-content">
-                    <h3>📝 スクリーンショット テキスト エディタ</h3>
-                    <p>Snipping Tool で撮影した画像にテキストを追加しましょう</p>
-                    <div class="status-buttons">
-                        <button class="btn btn-primary" onclick="document.getElementById('paste-btn').click()">
-                            📋 クリップボードから貼り付け
-                        </button>
-                        <button class="btn btn-info" onclick="document.getElementById('upload-btn').click()">
-                            📁 ファイルを選択
-                        </button>
+            <div id="editor-container">
+                <div id="image-container">
+                    <div id="placeholder-message">
+                        クリップボードから画像を貼り付けるか、ファイルを選択してください
                     </div>
-                    <p class="help-text">または <kbd>Ctrl+V</kbd> キーで貼り付け</p>
+                    <canvas id="canvas"></canvas>
                 </div>
             </div>
-        </div>
+        </main>
         
-        <input type="file" id="file-input" accept="image/*" style="display: none;">
+        <footer>
+            <p>スクリーンショットエディター v1.0</p>
+        </footer>
     </div>
-    
+
     <script src="script.js"></script>
 </body>
 </html>

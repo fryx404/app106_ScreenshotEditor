@@ -5,415 +5,206 @@
 }
 
 body {
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
+    font-family: 'Segoe UI', 'Meiryo UI', sans-serif;
+    background-color: #f5f5f5;
     color: #333;
+    line-height: 1.6;
 }
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 header {
-    text-align: center;
-    margin-bottom: 30px;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
 }
 
-header h1 {
-    color: #fff;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    font-size: 2.5rem;
+h1 {
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: #2c3e50;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     margin-bottom: 10px;
 }
 
-header h1::before {
-    content: "🎨 ";
-    font-size: 0.8em;
-}
-
-.toolbar {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 15px;
-    border-radius: 15px;
-    margin-bottom: 20px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    align-items: center;
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-    backdrop-filter: blur(4px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.btn {
-    padding: 10px 15px;
+button, .file-label {
+    background-color: #3498db;
+    color: white;
     border: none;
-    border-radius: 8px;
+    padding: 8px 16px;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s;
 }
 
-.btn-primary {
-    background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-    color: white;
+button:hover, .file-label:hover {
+    background-color: #2980b9;
 }
 
-.btn-secondary {
-    background: linear-gradient(45deg, #6C7B7F, #8E9AAF);
-    color: white;
+#clear-all-btn, #delete-selected-btn {
+    background-color: #e74c3c;
 }
 
-.btn-success {
-    background: linear-gradient(45deg, #56CCF2, #2F80ED);
-    color: white;
+#clear-all-btn:hover, #delete-selected-btn:hover {
+    background-color: #c0392b;
 }
 
-.btn-info {
-    background: linear-gradient(45deg, #667eea, #764ba2);
-    color: white;
+#save-btn {
+    background-color: #2ecc71;
 }
 
-.btn-warning {
-    background: linear-gradient(45deg, #FFD93D, #FF8E53);
-    color: white;
+#save-btn:hover {
+    background-color: #27ae60;
 }
 
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+input[type="file"] {
+    display: none;
 }
 
-.tool-btn {
-    background: #f8f9fa;
-    color: #333;
-    border: 2px solid transparent;
+.file-label {
+    display: inline-block;
 }
 
-.tool-btn.active {
-    background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-    color: white;
-    border-color: #FF6B6B;
-}
-
-/* ツールバーグループ共通スタイル */
-.import-group,
-.history-group, 
-.tool-group, 
-.draw-settings, 
-.text-settings, 
-.action-group {
+main {
+    flex: 1;
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.5);
-    border-radius: 8px;
-    flex-wrap: wrap;
-}
-
-.import-group {
-    background: rgba(72, 187, 120, 0.1);
-    border: 1px solid rgba(72, 187, 120, 0.3);
-}
-
-.history-group {
-    background: rgba(108, 123, 127, 0.1);
-    border: 1px solid rgba(108, 123, 127, 0.3);
-}
-
-.draw-settings {
-    background: rgba(78, 205, 196, 0.1);
-    border: 1px solid rgba(78, 205, 196, 0.3);
-}
-
-.text-settings {
-    background: rgba(102, 126, 234, 0.1);
-    border: 1px solid rgba(102, 126, 234, 0.3);
     flex-direction: column;
-    align-items: stretch;
 }
 
-
-
-.action-group {
-    background: rgba(86, 204, 242, 0.1);
-    border: 1px solid rgba(86, 204, 242, 0.3);
+#editor-container {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    position: relative;
+    overflow: hidden;
 }
 
-/* テキスト設定の行レイアウト */
-.text-row {
+#image-container {
+    width: 100%;
+    height: 100%;
     display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 8px;
-    margin: 2px 0;
-    flex-wrap: wrap;
+    position: relative;
 }
 
-/* ラベル共通スタイル */
-label {
-    font-weight: 600;
-    color: #333;
-    font-size: 12px;
-    white-space: nowrap;
+#placeholder-message {
+    color: #7f8c8d;
+    text-align: center;
+    padding: 20px;
 }
 
-#color-picker {
-    width: 40px;
-    height: 30px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+canvas {
+    max-width: 100%;
+    max-height: 100%;
+    display: none;
 }
 
-#line-width {
-    width: 100px;
+.text-element {
+    position: absolute;
+    cursor: move;
+    padding: 5px;
+    border: 2px solid transparent;
+    user-select: none;
+    z-index: 10;
 }
 
-#font-size, #text-color {
-    padding: 3px 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 12px;
+.text-element.selected {
+    border: 2px dashed #3498db;
 }
 
-#font-size {
-    width: 60px;
-}
-
-#text-color {
-    width: 30px;
-    height: 25px;
-    padding: 0;
-    cursor: pointer;
-}
-
-#font-family {
-    padding: 3px 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 12px;
-    background: white;
-    cursor: pointer;
-    min-width: 120px;
-}
-
-.text-style-buttons {
-    display: flex;
-    gap: 2px;
-}
-
-.btn-mini {
-    padding: 4px 8px;
-    font-size: 12px;
-    font-weight: bold;
-    min-width: 30px;
-    height: 25px;
-}
-
-#bold-btn.active {
-    background: #333;
-    color: white;
-}
-
-#italic-btn.active {
-    background: #333;
-    color: white;
-    font-style: italic;
+#text-input-container {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
 }
 
 #text-input {
-    flex: 1;
-    min-width: 120px;
-    padding: 3px 8px;
+    width: 100%;
+    height: 100px;
+    padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 12px;
-}
-
-/* 値表示スパン */
-#line-width-value, #font-size-unit {
-    font-size: 11px;
-    color: #666;
-    min-width: 25px;
-}
-
-.canvas-container {
-    position: relative;
-    background: white;
-    border-radius: 15px;
-    box-shadow: 0 10px 40px rgba(31, 38, 135, 0.37);
-    overflow: hidden;
-    margin-bottom: 20px;
-}
-
-#main-canvas {
-    display: block;
-    max-width: 100%;
-    cursor: crosshair;
-}
-
-#main-canvas.text-mode {
-    cursor: text;
-}
-
-#status-message {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    pointer-events: none;
-    z-index: 10;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 40px;
-    border-radius: 20px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-    border: 2px dashed #ccc;
-    max-width: 500px;
-}
-
-.status-content h3 {
-    color: #333;
-    font-size: 1.8rem;
+    resize: vertical;
+    font-family: inherit;
     margin-bottom: 10px;
 }
 
-.status-content p {
-    color: #666;
-    font-size: 1.1rem;
-    margin-bottom: 20px;
-}
-
-.status-buttons {
+.text-options {
+    margin-bottom: 10px;
     display: flex;
-    gap: 15px;
-    justify-content: center;
-    margin-bottom: 15px;
     flex-wrap: wrap;
+    gap: 15px;
 }
 
-.status-buttons .btn {
-    pointer-events: all;
-    font-size: 0.9rem;
-    padding: 12px 20px;
+.option-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.help-text {
-    font-size: 0.9rem;
-    color: #888;
-    font-style: italic;
+#font-size-input {
+    width: 60px;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
 }
 
-kbd {
-    background: #f1f1f1;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 2px 6px;
-    font-family: monospace;
-    font-size: 0.9em;
-    color: #333;
+#text-color, #stroke-color {
+    width: 40px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
 }
 
-.upload-area {
+#reset-defaults-btn {
+    background-color: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s;
+}
+
+#reset-defaults-btn:hover {
+    background-color: #95a5a6;
+}
+
+.text-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+footer {
+    margin-top: 20px;
     text-align: center;
+    color: #7f8c8d;
+    font-size: 14px;
 }
 
 .hidden {
     display: none;
-}
-
-/* レスポンシブデザイン */
-@media (max-width: 768px) {
-    .toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .tool-group, .color-group, .text-group {
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    
-    header h1 {
-        font-size: 2rem;
-    }
-}
-
-/* 選択範囲オーバーレイ */
-.selection-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 50;
-}
-
-.selection-box {
-    position: absolute;
-    border: 2px dashed #007bff;
-    background: rgba(0, 123, 255, 0.1);
-    pointer-events: none;
-}
-
-/* テキストオブジェクト */
-.text-object {
-    position: absolute;
-    cursor: move;
-    user-select: none;
-    z-index: 60;
-    padding: 2px;
-    border: 1px transparent solid;
-    border-radius: 3px;
-    transition: border-color 0.2s ease;
-}
-
-.text-object:hover {
-    border-color: rgba(0, 123, 255, 0.5);
-    background: rgba(0, 123, 255, 0.05);
-}
-
-.text-object.selected {
-    border-color: #007bff;
-    background: rgba(0, 123, 255, 0.1);
-}
-
-.text-object.dragging {
-    opacity: 0.8;
-    z-index: 70;
-}
-
-/* 無効化されたボタン */
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-}
-
-.btn:disabled:hover {
-    transform: none !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* アニメーション */
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.container > * {
-    animation: slideIn 0.5s ease-out;
 }

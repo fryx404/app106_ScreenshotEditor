@@ -1,861 +1,469 @@
-class ScreenshotEditor {
-    constructor() {
-        // 初期化の確認
-        console.log('ScreenshotEditor starting...');
-        
-        // DOM要素の取得
-        this.canvas = document.getElementById('main-canvas');
-        this.ctx = this.canvas.getContext('2d');
-        
-        // 状態管理
-        this.currentTool = 'text';
-        this.isDragging = false;
-        this.isEditingText = false;
-        
-        // テキスト設定
-        this.currentTextColor = '#000000';
-        this.currentFontSize = 100;
-        this.currentFontFamily = 'Arial';
-        this.isBold = false;
-        this.isItalic = false;
-        
-        // データ管理
-        this.history = [];
-        this.historyIndex = -1;
-        this.textObjects = [];
-        this.selectedTextObject = null;
-        
-        // 画像データ管理
-        this.baseImageData = null;  // 元画像
-        
+// グローバル変数
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let image = null;
+let textElements = [];
+let selectedTextElement = null;
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let isEditingText = false;
+let editingTextId = null;
 
-        
-        console.log('Initializing elements...');
-        this.initializeElements();
-        console.log('Setting up event listeners...');
-        this.setupEventListeners();
-        console.log('Setting up canvas...');
-        this.setupCanvas();
-        
-        this.saveToHistory();
-        console.log('ScreenshotEditor initialized successfully');
-    }
-    
-    initializeElements() {
-        try {
-            // 基本要素
-            this.pasteBtn = document.getElementById('paste-btn');
-            this.undoBtn = document.getElementById('undo-btn');
-            this.redoBtn = document.getElementById('redo-btn');
-            this.textBtn = document.getElementById('text-btn');
-            this.moveBtn = document.getElementById('move-btn');
-            this.clearTextBtn = document.getElementById('clear-text-btn');
-            this.clearBtn = document.getElementById('clear-btn');
-            this.saveBtn = document.getElementById('save-btn');
-            this.uploadBtn = document.getElementById('upload-btn');
-            this.fileInput = document.getElementById('file-input');
-            
-            // テキスト設定要素
-            this.textColor = document.getElementById('text-color');
-            this.fontSize = document.getElementById('font-size');
-            this.fontFamily = document.getElementById('font-family');
-            this.boldBtn = document.getElementById('bold-btn');
-            this.italicBtn = document.getElementById('italic-btn');
-            this.textInput = document.getElementById('text-input');
-            this.statusMessage = document.getElementById('status-message');
-            
-            // 要素の存在確認
-            const requiredElements = [
-                'pasteBtn', 'textBtn', 'moveBtn', 'canvas', 'textInput'
-            ];
-            
-            for (let elementName of requiredElements) {
-                if (!this[elementName]) {
-                    console.error(`Required element not found: ${elementName}`);
-                    throw new Error(`Required element not found: ${elementName}`);
-                }
-            }
-            
-            this.updateButtons();
-            console.log('All elements initialized successfully');
-        } catch (error) {
-            console.error('Error initializing elements:', error);
-            throw error;
-        }
-    }
-    
-    setupEventListeners() {
-        try {
-            // 画像読み込み
-            this.pasteBtn.addEventListener('click', () => this.pasteFromClipboard());
-            
-            // 履歴・クリア
-            this.undoBtn.addEventListener('click', () => this.undo());
-            this.redoBtn.addEventListener('click', () => this.redo());
-            this.clearTextBtn.addEventListener('click', () => this.clearText());
-            this.clearBtn.addEventListener('click', () => this.clearAll());
-            
-            // ツール
-            this.textBtn.addEventListener('click', () => this.setTool('text'));
-            this.moveBtn.addEventListener('click', () => this.setTool('move'));
-            
-            // 保存・アップロード
-            this.saveBtn.addEventListener('click', () => this.saveImage());
-            this.uploadBtn.addEventListener('click', () => this.fileInput.click());
-            this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-            
-            // ダブルクリックでテキスト編集
-            this.canvas.addEventListener('dblclick', (e) => {
-                const pos = this.getMousePos(e);
-                const clickedText = this.findTextAt(pos.x, pos.y);
-                if (clickedText) {
-                    this.selectedTextObject = clickedText;
-                    this.editSelectedText();
-                }
-            });
-            
-            // テキスト設定
-            this.textColor.addEventListener('change', (e) => {
-                this.currentTextColor = e.target.value;
-            });
-            
-            this.fontSize.addEventListener('change', (e) => {
-                this.currentFontSize = parseInt(e.target.value);
-            });
-            
-            this.fontFamily.addEventListener('change', (e) => {
-                this.currentFontFamily = e.target.value;
-            });
-            
-            this.boldBtn.addEventListener('click', () => this.toggleBold());
-            this.italicBtn.addEventListener('click', () => this.toggleItalic());
-            
-            // キャンバス
-            this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-            this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-            this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-            this.canvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
-            
-            // キーボード・ペースト
-            document.addEventListener('keydown', (e) => this.handleKeyDown(e));
-            document.addEventListener('paste', (e) => this.handlePaste(e));
-            
-            // ドラッグ&ドロップ
-            this.canvas.addEventListener('dragover', (e) => this.handleDragOver(e));
-            this.canvas.addEventListener('drop', (e) => this.handleDrop(e));
-            
-            console.log('All event listeners set up successfully');
-        } catch (error) {
-            console.error('Error setting up event listeners:', error);
-            throw error;
-        }
-    }
-    
-    setupCanvas() {
-        this.canvas.width = 800;
-        this.canvas.height = 600;
-        
-        // 白い背景で初期化
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // 初期状態の基本画像データを保存（白い背景）
-        this.baseImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        
-        // テキストオブジェクトは空の配列
-        this.textObjects = [];
-        
-        console.log('Canvas set up:', this.canvas.width, 'x', this.canvas.height);
-    }
-    
-    // クリップボードから貼り付け
-    async pasteFromClipboard() {
-        console.log('Attempting to paste from clipboard...');
-        try {
-            // Clipboard APIを使用
-            if (navigator.clipboard && navigator.clipboard.read) {
-                const clipboardItems = await navigator.clipboard.read();
-                
+// デフォルト設定
+const DEFAULT_FONT_SIZE = 80;
+const DEFAULT_TEXT_COLOR = '#ffffff';
+const DEFAULT_BG_COLOR = '#000000';
+
+// DOMが読み込まれた後に実行
+document.addEventListener('DOMContentLoaded', () => {
+    // 要素の取得
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+    const pasteBtn = document.getElementById('paste-btn');
+    const fileInput = document.getElementById('file-input');
+    const clearAllBtn = document.getElementById('clear-all-btn');
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const textInputContainer = document.getElementById('text-input-container');
+    const textInput = document.getElementById('text-input');
+    const applyTextBtn = document.getElementById('apply-text-btn');
+    const cancelTextBtn = document.getElementById('cancel-text-btn');
+    const placeholder = document.getElementById('placeholder-message');
+
+    // クリップボードから画像を貼り付け
+    pasteBtn.addEventListener('click', () => {
+        navigator.clipboard.read()
+            .then(clipboardItems => {
                 for (const clipboardItem of clipboardItems) {
                     for (const type of clipboardItem.types) {
                         if (type.startsWith('image/')) {
-                            const blob = await clipboardItem.getType(type);
-                            await this.loadImageFromBlob(blob);
+                            clipboardItem.getType(type)
+                                .then(blob => {
+                                    loadImageFromBlob(blob);
+                                })
+                                .catch(err => {
+                                    console.error('クリップボードからの画像の取得に失敗しました:', err);
+                                    alert('クリップボードからの画像の取得に失敗しました。');
+                                });
                             return;
                         }
                     }
                 }
-                
-                this.showMessage('クリップボードに画像が見つかりません', 'warning');
-            } else {
-                this.showMessage('このブラウザではクリップボード機能がサポートされていません', 'warning');
-            }
-        } catch (error) {
-            console.error('Clipboard paste error:', error);
-            this.showMessage('クリップボードへのアクセスが拒否されました。Ctrl+V をお試しください。', 'warning');
-        }
-    }
-    
-    // ペーストイベント処理
-    handlePaste(e) {
-        console.log('Paste event detected');
-        e.preventDefault();
-        
-        const items = e.clipboardData?.items;
-        if (!items) return;
-        
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            
-            if (item.type.startsWith('image/')) {
-                const blob = item.getAsFile();
-                if (blob) {
-                    this.loadImageFromBlob(blob);
+                alert('クリップボードに画像が見つかりませんでした。');
+            })
+            .catch(err => {
+                console.error('クリップボードの読み取りに失敗しました:', err);
+                alert('クリップボードの読み取りに失敗しました。ブラウザの権限を確認してください。');
+            });
+    });
+
+    // ドキュメント全体のペーストイベントをリッスン
+    document.addEventListener('paste', (e) => {
+        if (e.clipboardData && e.clipboardData.items) {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    loadImageFromBlob(blob);
+                    e.preventDefault();
                     return;
                 }
             }
         }
-        
-        this.showMessage('ペーストされた内容に画像がありません', 'warning');
-    }
-    
-    // ドラッグ&ドロップ処理
-    handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-    }
-    
-    handleDrop(e) {
-        e.preventDefault();
-        
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            const file = files[0];
-            if (file.type.startsWith('image/')) {
-                this.loadImageFromBlob(file);
+    });
+
+    // ファイル選択から画像を読み込み
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            if (file.type.match('image.*')) {
+                loadImageFromBlob(file);
             } else {
-                this.showMessage('画像ファイルをドロップしてください', 'warning');
+                alert('画像ファイルを選択してください。');
             }
         }
-    }
-    
-    // Blobから画像を読み込み
-    async loadImageFromBlob(blob) {
-        try {
-            const imageUrl = URL.createObjectURL(blob);
-            const img = new Image();
-            
-            img.onload = () => {
-                // キャンバスサイズを画像に合わせる
-                this.canvas.width = img.width;
-                this.canvas.height = img.height;
-                
-                // 白い背景で初期化
-                this.ctx.fillStyle = 'white';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
-                // 画像を描画
-                this.ctx.drawImage(img, 0, 0);
-                
-                // URL を解放
-                URL.revokeObjectURL(imageUrl);
-                
-                // ステータスメッセージを隠す
-                if (this.statusMessage) {
-                    this.statusMessage.classList.add('hidden');
+    });
+
+    // デフォルト設定に戻すボタン
+    const resetDefaultsBtn = document.getElementById('reset-defaults-btn');
+    resetDefaultsBtn.addEventListener('click', () => {
+        const fontSizeInput = document.getElementById('font-size-input');
+        const textColor = document.getElementById('text-color');
+        const bgColor = document.getElementById('bg-color');
+        
+        fontSizeInput.value = DEFAULT_FONT_SIZE;
+        textColor.value = DEFAULT_TEXT_COLOR;
+        bgColor.value = DEFAULT_BG_COLOR;
+    });
+
+    // テキスト適用ボタン
+    applyTextBtn.addEventListener('click', () => {
+        const text = textInput.value;  // トリムしない（改行を保持）
+        const fontSizeInput = document.getElementById('font-size-input');
+        const fontSize = parseInt(fontSizeInput.value) || DEFAULT_FONT_SIZE;
+        const textColor = document.getElementById('text-color').value;
+        const bgColor = document.getElementById('bg-color').value;
+        
+        if (text) {
+            if (editingTextId !== null) {
+                // 既存のテキストを編集
+                const textElement = textElements.find(el => el.id === editingTextId);
+                if (textElement) {
+                    textElement.text = text;
+                    textElement.color = textColor;
+                    textElement.bgColor = bgColor;
+                    
+                    // 改行で分割
+                    const lines = text.split('\n');
+                    textElement.lines = lines;
+                    
+                    // フォントサイズが変更された場合は幅と高さを再計算
+                    if (textElement.fontSize !== fontSize) {
+                        textElement.fontSize = fontSize;
+                        textElement.lineHeight = fontSize * 1.2;
+                    }
+                    
+                    // 各行の幅を計算して最大幅を取得
+                    ctx.font = `${fontSize}px sans-serif`;
+                    let maxWidth = 0;
+                    lines.forEach(line => {
+                        const metrics = ctx.measureText(line);
+                        maxWidth = Math.max(maxWidth, metrics.width);
+                    });
+                    
+                    textElement.width = maxWidth;
+                    textElement.height = textElement.lineHeight * lines.length;
+                    
+                    updateCanvas();
                 }
-                
-                // テキストオブジェクトをクリア
-                this.textObjects = [];
-                this.selectedTextObject = null;
-                
-                // 基本画像として保存
-                this.baseImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                
-                this.saveToHistory();
-                this.updateButtons();
-                
-                this.showMessage('画像が読み込まれました！', 'success');
-                console.log('Image loaded successfully:', img.width, 'x', img.height);
-            };
-            
-            img.onerror = () => {
-                URL.revokeObjectURL(imageUrl);
-                this.showMessage('画像の読み込みに失敗しました', 'error');
-            };
-            
-            img.src = imageUrl;
-            
-        } catch (error) {
-            console.error('Image loading error:', error);
-            this.showMessage('画像の処理に失敗しました', 'error');
-        }
-    }
-    
-    // ツール選択
-    setTool(tool) {
-        console.log('Setting tool to:', tool);
-        
-        this.currentTool = tool;
-        
-        // すべてのツールボタンからactiveクラスを削除
-        document.querySelectorAll('.tool-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        // 選択したツールボタンにactiveクラスを追加
-        if (tool === 'text') {
-            this.textBtn.classList.add('active');
-            this.canvas.style.cursor = 'text';
-        } else if (tool === 'move') {
-            this.moveBtn.classList.add('active');
-            this.canvas.style.cursor = 'move';
-        }
-        
-        console.log('Tool set to:', tool);
-    }
-    
-    // テキスト設定
-    toggleBold() {
-        this.isBold = !this.isBold;
-        this.boldBtn.classList.toggle('active', this.isBold);
-    }
-    
-    toggleItalic() {
-        this.isItalic = !this.isItalic;
-        this.italicBtn.classList.toggle('active', this.isItalic);
-    }
-    
-    getFontString() {
-        let font = '';
-        if (this.isBold) font += 'bold ';
-        if (this.isItalic) font += 'italic ';
-        font += `${this.currentFontSize}px ${this.currentFontFamily}`;
-        return font;
-    }
-    
-
-    
-    // マウスイベント処理
-    getMousePos(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        
-        return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
-        };
-    }
-    
-    handleMouseDown(e) {
-        const pos = this.getMousePos(e);
-        console.log('Mouse down at:', pos, 'Tool:', this.currentTool);
-        
-        if (this.currentTool === 'text') {
-            this.addTextAtPosition(pos.x, pos.y);
-        } else if (this.currentTool === 'move') {
-            this.handleMoveStart(pos);
-        }
-    }
-    
-    handleMouseMove(e) {
-        if (this.isDragging && this.selectedTextObject) {
-            this.handleMoveUpdate(e);
-        }
-    }
-    
-    handleMouseUp(e) {
-        if (this.isDragging) {
-            this.isDragging = false;
-            this.selectedTextObject = null;
-            this.saveToHistory();
-        }
-    }
-    
-
-    
-    // テキスト機能
-    addTextAtPosition(x, y) {
-        console.log('Adding text at:', x, y);
-        const text = this.textInput.value.trim();
-        if (!text) {
-            this.showMessage('テキストを入力してください', 'warning');
-            return;
-        }
-        
-        const textObject = {
-            id: Date.now(),
-            text: text,
-            x: x,
-            y: y,
-            color: this.currentTextColor,
-            fontSize: this.currentFontSize,
-            fontFamily: this.currentFontFamily,
-            bold: this.isBold,
-            italic: this.isItalic
-        };
-        
-        this.textObjects.push(textObject);
-        this.renderText(textObject);
-        
-        this.textInput.value = '';
-        this.saveToHistory();
-        this.showMessage('テキストが追加されました！', 'success');
-        
-        console.log('Text added:', textObject);
-    }
-    
-    renderText(textObject) {
-        const font = this.getTextFont(textObject);
-        this.ctx.font = font;
-        this.ctx.fillStyle = textObject.color;
-        this.ctx.textBaseline = 'top';
-        
-        // 背景
-        const metrics = this.ctx.measureText(textObject.text);
-        const width = metrics.width;
-        const height = textObject.fontSize;
-        
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.fillRect(textObject.x - 2, textObject.y - 2, width + 4, height + 4);
-        
-        // テキスト
-        this.ctx.fillStyle = textObject.color;
-        this.ctx.fillText(textObject.text, textObject.x, textObject.y);
-        
-        // 選択中の表示
-        if (textObject === this.selectedTextObject) {
-            this.ctx.strokeStyle = '#007bff';
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(textObject.x - 4, textObject.y - 4, width + 8, height + 8);
-        }
-    }
-    
-    getTextFont(textObject) {
-        let font = '';
-        if (textObject.bold) font += 'bold ';
-        if (textObject.italic) font += 'italic ';
-        font += `${textObject.fontSize}px ${textObject.fontFamily}`;
-        return font;
-    }
-    
-    renderAllText() {
-        // テキストオブジェクトを順番に描画（重複を防ぐ）
-        this.textObjects.forEach(obj => {
-            this.renderText(obj);
-        });
-    }
-    
-    // 移動機能
-    handleMoveStart(pos) {
-        this.selectedTextObject = this.findTextAt(pos.x, pos.y);
-        if (this.selectedTextObject) {
-            this.isDragging = true;
-            this.dragOffset = {
-                x: pos.x - this.selectedTextObject.x,
-                y: pos.y - this.selectedTextObject.y
-            };
-            this.canvas.style.cursor = 'grabbing';
-        }
-        this.redrawCanvas();
-    }
-    
-    handleMoveUpdate(e) {
-        if (this.selectedTextObject && this.isDragging) {
-            const pos = this.getMousePos(e);
-            this.selectedTextObject.x = pos.x - this.dragOffset.x;
-            this.selectedTextObject.y = pos.y - this.dragOffset.y;
-            
-            // キャンバスを完全に再描画してテキストの重複を防ぐ
-            this.redrawCanvas();
-        }
-    }
-    
-    findTextAt(x, y) {
-        for (let i = this.textObjects.length - 1; i >= 0; i--) {
-            const obj = this.textObjects[i];
-            const font = this.getTextFont(obj);
-            this.ctx.font = font;
-            const metrics = this.ctx.measureText(obj.text);
-            
-            if (x >= obj.x && x <= obj.x + metrics.width &&
-                y >= obj.y && y <= obj.y + obj.fontSize) {
-                return obj;
-            }
-        }
-        return null;
-    }
-    
-
-    
-    // 履歴管理（テキスト特化版）
-    saveToHistory() {
-        // 現在のキャンバス全体の状態を取得
-        const currentCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        
-        // 履歴を現在位置までに切り詰め
-        this.history = this.history.slice(0, this.historyIndex + 1);
-        
-        // 新しい状態を履歴に追加
-        this.history.push({
-            // 現在のキャンバス状態を保存
-            canvasState: currentCanvasState,
-            // 基本画像を保存（コピーを作成）
-            baseImageData: this.baseImageData ? this.ctx.createImageData(this.baseImageData) : null,
-            // テキストオブジェクトを保存（ディープコピー）
-            textObjects: JSON.parse(JSON.stringify(this.textObjects))
-        });
-        
-        // 履歴が長すぎる場合は古いものを削除
-        if (this.history.length > 50) {
-            this.history.shift();
-        } else {
-            this.historyIndex++;
-        }
-        
-        // ボタンの状態を更新
-        this.updateButtons();
-    }
-    
-    undo() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            this.restoreFromHistory();
-        }
-    }
-    
-    redo() {
-        if (this.historyIndex < this.history.length - 1) {
-            this.historyIndex++;
-            this.restoreFromHistory();
-        }
-    }
-    
-    restoreFromHistory() {
-        if (this.historyIndex >= 0 && this.historyIndex < this.history.length) {
-            const state = this.history[this.historyIndex];
-            
-            // 1. キャンバスをクリア
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            
-            // 2. キャンバス全体の状態を復元（最も効率的）
-            if (state.canvasState) {
-                this.ctx.putImageData(state.canvasState, 0, 0);
-            }
-            
-            // 3. 内部状態も復元
-            // 基本画像を復元
-            if (state.baseImageData) {
-                this.baseImageData = this.ctx.createImageData(state.baseImageData);
-                Object.assign(this.baseImageData.data, state.baseImageData.data);
+                editingTextId = null;
             } else {
-                this.baseImageData = null;
+                // 新しいテキストを追加
+                if (!image) {
+                    alert('先に画像を読み込んでください。');
+                    return;
+                }
+                addTextToCanvas(text);
             }
-            
-            // テキストオブジェクトを復元
-            this.textObjects = JSON.parse(JSON.stringify(state.textObjects));
-            
-            // 4. テキストの選択状態をリセット
-            this.selectedTextObject = null;
         }
-        
-        // ボタンの状態を更新
-        this.updateButtons();
-    }
-    
-    // キャンバス再描画
-    redrawCanvas() {
-        // 1. まず基本画像（スクリーンショット）を描画
-        if (this.baseImageData) {
-            this.ctx.putImageData(this.baseImageData, 0, 0);
+        textInput.value = '';
+        textInput.focus();
+    });
+
+    // テキスト入力キャンセルボタン
+    cancelTextBtn.addEventListener('click', () => {
+        cancelTextInput();
+        editingTextId = null;
+    });
+
+    // 全テキスト削除ボタン
+    clearAllBtn.addEventListener('click', () => {
+        if (textElements.length > 0) {
+            if (confirm('すべてのテキストを削除しますか？')) {
+                textElements = [];
+                selectedTextElement = null;
+                updateCanvas();
+            }
+        }
+    });
+
+    // 選択テキスト削除ボタン
+    deleteSelectedBtn.addEventListener('click', () => {
+        if (selectedTextElement) {
+            textElements = textElements.filter(el => el.id !== selectedTextElement.id);
+            selectedTextElement = null;
+            updateCanvas();
         } else {
-            // 基本画像がない場合は白い背景
-            this.ctx.fillStyle = 'white';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            alert('削除するテキストを選択してください。');
         }
-        
-        // 2. テキストを描画
-        this.renderAllText();
-    }
-    
-    // ファイル処理
-    handleFileUpload(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        if (!file.type.startsWith('image/')) {
-            this.showMessage('画像ファイルを選択してください', 'warning');
+    });
+
+    // 画像保存ボタン
+    saveBtn.addEventListener('click', () => {
+        if (!image) {
+            alert('画像が読み込まれていません。');
             return;
         }
-        
-        this.loadImageFromBlob(file);
-    }
-    
 
-    
-    // テキストのみをクリア
-    clearText() {
-        // テキストオブジェクトをクリア
-        this.textObjects = [];
-        this.selectedTextObject = null;
-        
-        // キャンバスを再描画（テキストなしで）
-        this.redrawCanvas();
-        
-        this.saveToHistory();
-        this.updateButtons();
-        
-        this.showMessage('テキストがクリアされました', 'info');
-    }
-    
-    // すべてをクリア
-    clearAll() {
-        // キャンバスを白でクリア
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // すべてのデータをリセット
-        this.textObjects = [];
-        this.selectedTextObject = null;
-        this.baseImageData = null;
-        
-        this.saveToHistory();
-        this.updateButtons();
-        
-        // ステータスメッセージを表示
-        if (this.statusMessage) {
-            this.statusMessage.classList.remove('hidden');
-        }
-        
-        this.showMessage('すべてクリアされました', 'info');
-    }
-    
-    // 保存
-    saveImage() {
+        // キャンバス上のすべての要素を描画
+        drawImageAndTexts();
+
+        // 画像をダウンロード
         const link = document.createElement('a');
-        link.download = `screenshot-edit-${Date.now()}.png`;
-        link.href = this.canvas.toDataURL();
+        link.download = 'screenshot-edited.png';
+        link.href = canvas.toDataURL('image/png');
         link.click();
-        this.showMessage('画像が保存されました！', 'success');
-    }
-    
-    // キーボードイベント
-    handleKeyDown(e) {
-        // Ctrl+Z (Undo)
-        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-            e.preventDefault();
-            this.undo();
-        }
+    });
+
+    // キャンバスのクリックイベント（テキスト選択）
+    canvas.addEventListener('mousedown', (e) => {
+        if (!image) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
         
-        // Ctrl+Y or Ctrl+Shift+Z (Redo)
-        if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
-            e.preventDefault();
-            this.redo();
-        }
-        
-        // Ctrl+V (Paste)
-        if (e.ctrlKey && e.key === 'v') {
-            e.preventDefault();
-            this.pasteFromClipboard();
-        }
-        
-        // Escキー
-        if (e.key === 'Escape') {
-            if (this.isEditingText) {
-                // 編集モードを終了
-                this.isEditingText = false;
-                this.selectedTextObject = null;
-                this.textInput.value = '';
-                this.redrawCanvas();
-            } else {
-                this.setTool('text');
-            }
-        }
-        
-        // Enterキー（テキスト編集確定）
-        if (e.key === 'Enter' && this.isEditingText && this.selectedTextObject) {
-            const newText = this.textInput.value.trim();
-            if (newText) {
-                // テキストを更新
-                this.selectedTextObject.text = newText;
-                this.selectedTextObject.color = this.currentTextColor;
-                this.selectedTextObject.fontSize = this.currentFontSize;
-                this.selectedTextObject.fontFamily = this.currentFontFamily;
-                this.selectedTextObject.bold = this.isBold;
-                this.selectedTextObject.italic = this.isItalic;
+        // スケール調整
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const scaledX = x * scaleX;
+        const scaledY = y * scaleY;
+
+        // テキスト要素の選択チェック（後ろから前に）
+        let found = false;
+        for (let i = textElements.length - 1; i >= 0; i--) {
+            const el = textElements[i];
+            if (
+                scaledX >= el.x &&
+                scaledX <= el.x + el.width &&
+                scaledY >= el.y &&
+                scaledY <= el.y + el.height
+            ) {
+                // ダブルクリックでテキスト編集
+                if (e.detail === 2 && el === selectedTextElement) {
+                    editingTextId = el.id;
+                    textInput.value = el.text;
+                    const fontSizeInput = document.getElementById('font-size-input');
+                    fontSizeInput.value = el.fontSize;
+                    const textColor = document.getElementById('text-color');
+                    textColor.value = el.color;
+                    const bgColor = document.getElementById('bg-color');
+                    bgColor.value = el.bgColor || DEFAULT_BG_COLOR;
+                    textInput.focus();
+                    return;
+                }
+
+                // テキスト選択
+                selectedTextElement = el;
+                isDragging = true;
+                dragOffsetX = scaledX - el.x;
+                dragOffsetY = scaledY - el.y;
+                found = true;
+
+                // 選択したテキストを配列の最後に移動（前面表示）
+                textElements = textElements.filter(item => item.id !== el.id);
+                textElements.push(el);
                 
-                // 編集モードを終了
-                this.isEditingText = false;
-                this.selectedTextObject = null;
-                this.textInput.value = '';
-                this.redrawCanvas();
-                this.saveToHistory();
-                this.showMessage('テキストが更新されました', 'success');
+                updateCanvas();
+                break;
             }
         }
-        
-        // Delete キー
-        if (e.key === 'Delete' && this.selectedTextObject) {
-            this.deleteSelectedText();
-        }
-        
-        // E キー（テキスト編集開始）
-        if (e.key === 'e' && this.selectedTextObject && !this.isEditingText) {
-            this.editSelectedText();
-        }
-    }
-    
-    deleteSelectedText() {
-        if (this.selectedTextObject) {
-            const index = this.textObjects.indexOf(this.selectedTextObject);
-            if (index !== -1) {
-                this.textObjects.splice(index, 1);
-                this.selectedTextObject = null;
-                this.redrawCanvas();
-                this.saveToHistory();
-                this.showMessage('テキストが削除されました', 'info');
-            }
-        }
-    }
-    
-    // テキスト編集機能
-    editSelectedText() {
-        if (this.selectedTextObject) {
-            // テキスト入力フィールドに現在のテキストをセット
-            this.textInput.value = this.selectedTextObject.text;
-            
-            // テキスト設定を選択中のテキストに合わせる
-            this.currentTextColor = this.selectedTextObject.color;
-            this.currentFontSize = this.selectedTextObject.fontSize;
-            this.currentFontFamily = this.selectedTextObject.fontFamily;
-            this.isBold = this.selectedTextObject.bold;
-            this.isItalic = this.selectedTextObject.italic;
-            
-            // UI更新
-            this.textColor.value = this.currentTextColor;
-            this.fontSize.value = this.currentFontSize;
-            this.fontFamily.value = this.currentFontFamily;
-            this.boldBtn.classList.toggle('active', this.isBold);
-            this.italicBtn.classList.toggle('active', this.isItalic);
-            
-            // テキスト入力にフォーカス
-            this.textInput.focus();
-            
-            // 編集モードに入る
-            this.isEditingText = true;
-            
-            this.showMessage('テキストを編集してEnterキーを押してください', 'info');
-        }
-    }
-    
-    // UI更新
-    updateButtons() {
-        if (this.undoBtn) this.undoBtn.disabled = this.historyIndex <= 0;
-        if (this.redoBtn) this.redoBtn.disabled = this.historyIndex >= this.history.length - 1;
-    }
-    
-    // 通知システム
-    showMessage(message, type = 'info') {
-        console.log(`Message [${type}]:`, message);
-        
-        const notification = document.createElement('div');
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-            z-index: 1000;
-            max-width: 350px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideInRight 0.3s ease-out;
-        `;
-        
-        switch (type) {
-            case 'success':
-                notification.style.background = 'linear-gradient(45deg, #56CCF2, #2F80ED)';
-                break;
-            case 'error':
-                notification.style.background = 'linear-gradient(45deg, #FF6B6B, #FF8E53)';
-                break;
-            case 'warning':
-                notification.style.background = 'linear-gradient(45deg, #FFD93D, #FF8E53)';
-                break;
-            default:
-                notification.style.background = 'linear-gradient(45deg, #667eea, #764ba2)';
-        }
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 3000);
-    }
-}
 
-// CSS アニメーション
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
+        if (!found) {
+            selectedTextElement = null;
+            updateCanvas();
         }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    
-    .hidden {
-        display: none !important;
-    }
-`;
-document.head.appendChild(style);
+    });
 
-// 初期化
-let editor = null;
+    // マウス移動イベント（テキスト移動）
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDragging || !selectedTextElement) return;
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded');
-    try {
-        editor = new ScreenshotEditor();
-        console.log('Editor initialized successfully');
-    } catch (error) {
-        console.error('Failed to initialize editor:', error);
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
         
-        const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #ff6b6b;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            z-index: 10000;
-            text-align: center;
-        `;
-        errorDiv.innerHTML = `
-            <h3>初期化エラー</h3>
-            <p>アプリケーションの初期化に失敗しました。</p>
-            <p>ページを再読み込みしてください。</p>
-            <button onclick="location.reload()" style="margin-top: 10px; padding: 5px 10px;">再読み込み</button>
-        `;
-        document.body.appendChild(errorDiv);
-    }
+        // スケール調整
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const scaledX = x * scaleX;
+        const scaledY = y * scaleY;
+
+        selectedTextElement.x = scaledX - dragOffsetX;
+        selectedTextElement.y = scaledY - dragOffsetY;
+        
+        // キャンバス内に収める
+        selectedTextElement.x = Math.max(0, Math.min(canvas.width - selectedTextElement.width, selectedTextElement.x));
+        selectedTextElement.y = Math.max(0, Math.min(canvas.height - selectedTextElement.height, selectedTextElement.y));
+        
+        updateCanvas();
+    });
+
+    // マウスアップイベント（ドラッグ終了）
+    canvas.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    // マウスがキャンバスから出た時
+    canvas.addEventListener('mouseleave', () => {
+        isDragging = false;
+    });
 });
 
-// デバッグ用グローバル関数
-window.debugEditor = () => {
-    console.log('Editor state:', editor);
-    console.log('Current tool:', editor?.currentTool);
-    console.log('Text objects:', editor?.textObjects);
-};
+// Blobから画像を読み込む
+function loadImageFromBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    
+    img.onload = () => {
+        image = img;
+        
+        // キャンバスサイズを画像に合わせる
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // プレースホルダーを非表示にしてキャンバスを表示
+        document.getElementById('placeholder-message').style.display = 'none';
+        canvas.style.display = 'block';
+        
+        updateCanvas();
+        URL.revokeObjectURL(url);
+    };
+    
+    img.onerror = () => {
+        alert('画像の読み込みに失敗しました。');
+        URL.revokeObjectURL(url);
+    };
+    
+    img.src = url;
+}
+
+// テキスト入力欄を準備
+function prepareTextInput() {
+    const textInput = document.getElementById('text-input');
+    textInput.value = '';
+    textInput.focus();
+    isEditingText = true;
+}
+
+// テキスト入力をキャンセル
+function cancelTextInput() {
+    const textInput = document.getElementById('text-input');
+    textInput.value = '';
+    isEditingText = false;
+}
+
+// テキストをキャンバスに追加
+function addTextToCanvas(text) {
+    const fontSizeInput = document.getElementById('font-size-input');
+    const fontSize = parseInt(fontSizeInput.value) || DEFAULT_FONT_SIZE;
+    const textColor = document.getElementById('text-color').value;
+    const bgColor = document.getElementById('bg-color').value;
+    
+    // 改行で分割
+    const lines = text.split('\n');
+    
+    ctx.font = `${fontSize}px sans-serif`;
+    
+    // 各行の幅を計算して最大幅を取得
+    let maxWidth = 0;
+    lines.forEach(line => {
+        const metrics = ctx.measureText(line);
+        maxWidth = Math.max(maxWidth, metrics.width);
+    });
+    
+    // 高さは行数 × 行の高さ
+    const lineHeight = fontSize * 1.2;
+    const textHeight = lineHeight * lines.length;
+    
+    const newText = {
+        id: Date.now().toString(),
+        text: text,
+        lines: lines,
+        x: (canvas.width - maxWidth) / 2,
+        y: (canvas.height - textHeight) / 2,
+        width: maxWidth,
+        height: textHeight,
+        fontSize: fontSize,
+        lineHeight: lineHeight,
+        color: textColor,
+        bgColor: bgColor
+    };
+    
+    textElements.push(newText);
+    selectedTextElement = newText;
+    updateCanvas();
+}
+
+// キャンバスの更新
+function updateCanvas() {
+    drawImageAndTexts();
+}
+
+// HEXカラーをRGBA形式に変換
+function hexToRgba(hex, alpha) {
+    // #を取り除く
+    hex = hex.replace('#', '');
+    
+    // 16進数をRGB値に変換
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // RGBA形式の文字列を返す
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// 画像とテキストを描画
+function drawImageAndTexts() {
+    // キャンバスをクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 画像を描画
+    if (image) {
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    }
+    
+    // テキストを描画
+    textElements.forEach(el => {
+        ctx.font = `${el.fontSize}px sans-serif`;
+        ctx.fillStyle = el.color;
+        
+        // 改行対応テキスト描画
+        if (el.lines) {
+            // 複数行テキスト
+            el.lines.forEach((line, index) => {
+                const y = el.y + (index * el.lineHeight) + el.fontSize;
+                const padding = el.fontSize * 0.2;
+                
+                // 背景を描画（50%透明度）
+                if (el.bgColor) {
+                    const bgColor = hexToRgba(el.bgColor, 0.5); // 50%透明度
+                    ctx.fillStyle = bgColor;
+                    
+                    // 各行の幅を計算
+                    const metrics = ctx.measureText(line);
+                    const lineWidth = metrics.width;
+                    
+                    // 背景を描画
+                    ctx.fillRect(
+                        el.x - padding, 
+                        y - el.fontSize + padding, 
+                        lineWidth + padding * 2, 
+                        el.fontSize + padding
+                    );
+                }
+                
+                // テキストを描画
+                ctx.fillStyle = el.color;
+                ctx.fillText(line, el.x, y);
+            });
+        } else {
+            // 後方互換性のため、古いテキスト形式もサポート
+            // 背景を描画（50%透明度）
+            if (el.bgColor) {
+                const bgColor = hexToRgba(el.bgColor, 0.5); // 50%透明度
+                ctx.fillStyle = bgColor;
+                const padding = el.fontSize * 0.2;
+                ctx.fillRect(
+                    el.x - padding, 
+                    el.y - padding, 
+                    el.width + padding * 2, 
+                    el.height + padding
+                );
+            }
+            
+            // テキストを描画
+            ctx.fillStyle = el.color;
+            ctx.fillText(el.text, el.x, el.y + el.fontSize);
+        }
+        
+        // 選択されたテキストに枠を表示
+        if (selectedTextElement && el.id === selectedTextElement.id) {
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(el.x - 2, el.y - 2, el.width + 4, el.height + 4);
+        }
+    });
+}
