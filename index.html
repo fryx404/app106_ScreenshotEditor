@@ -15,15 +15,14 @@
                 <input type="file" id="file-input" accept="image/*">
                 <label for="file-input" class="file-label">画像ファイルを選択</label>
                 <button id="clear-all-btn">全テキスト削除</button>
-                <button id="delete-selected-btn">選択テキスト削除</button>
                 <button id="save-btn">画像を保存</button>
             </div>
             <div id="text-input-container">
                 <textarea id="text-input" placeholder="テキストを入力してください（Enterで改行）"></textarea>
                 <div class="text-options">
                     <div class="option-group">
-                        <label for="font-size-input">文字サイズ:</label>
-                        <input type="number" id="font-size-input" min="10" max="200" value="80">px
+                        <label for="font-size-input">文字サイズ: <span class="size-container"><span id="font-size-value">080</span>px</span></label>
+                        <input type="range" id="font-size-input" min="10" max="200" value="80" step="1">
                     </div>
                     <div class="option-group">
                         <label for="text-color">文字色:</label>
@@ -32,6 +31,10 @@
                     <div class="option-group">
                         <label for="bg-color">背景色:</label>
                         <input type="color" id="bg-color" value="#000000">
+                    </div>
+                    <div class="option-group">
+                        <label for="bg-enabled">背景色を有効にする:</label>
+                        <input type="checkbox" id="bg-enabled" checked>
                     </div>
                     <div class="option-group">
                         <button id="reset-defaults-btn">デフォルト設定に戻す</button>
@@ -57,7 +60,7 @@
         </main>
         
         <footer>
-            <p>スクリーンショットにテキストを追加するツール v1.1</p>
+            <p>スクリーンショットにテキストを追加するツール v1.2</p>
         </footer>
     </div>
 

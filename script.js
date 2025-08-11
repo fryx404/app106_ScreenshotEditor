@@ -14,6 +14,7 @@ let editingTextId = null;
 const DEFAULT_FONT_SIZE = 80;
 const DEFAULT_TEXT_COLOR = '#ffffff';
 const DEFAULT_BG_COLOR = '#000000';
+const DEFAULT_BG_ENABLED = false;
 
 // DOMが読み込まれた後に実行
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,13 +24,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const pasteBtn = document.getElementById('paste-btn');
     const fileInput = document.getElementById('file-input');
     const clearAllBtn = document.getElementById('clear-all-btn');
-    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
     const saveBtn = document.getElementById('save-btn');
     const textInputContainer = document.getElementById('text-input-container');
     const textInput = document.getElementById('text-input');
     const applyTextBtn = document.getElementById('apply-text-btn');
     const cancelTextBtn = document.getElementById('cancel-text-btn');
     const placeholder = document.getElementById('placeholder-message');
+
+    // 背景色の初期状態を設定
+    const bgEnabled = document.getElementById('bg-enabled');
+    bgEnabled.checked = DEFAULT_BG_ENABLED; // falseを設定
 
     // クリップボードから画像を貼り付け
     pasteBtn.addEventListener('click', () => {
@@ -85,16 +89,82 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 各設定の変更をリアルタイムで反映
+    const fontSizeInput = document.getElementById('font-size-input');
+    const fontSizeValue = document.getElementById('font-size-value');
+    const textColorInput = document.getElementById('text-color');
+    const bgColorInput = document.getElementById('bg-color');
+    const bgEnabledInput = document.getElementById('bg-enabled');
+
+    // テキスト設定の変更を監視して更新する関数
+    function updateTextElement() {
+        if (editingTextId === null) return;
+        
+        const textElement = textElements.find(el => el.id === editingTextId);
+        if (!textElement) return;
+
+        const fontSize = parseInt(fontSizeInput.value) || DEFAULT_FONT_SIZE;
+        
+        // 一時的な更新用のオブジェクトを作成
+        const tempElement = {
+            ...textElement,
+            fontSize: fontSize,
+            lineHeight: fontSize * 1.2,
+            color: textColorInput.value,
+            bgColor: bgEnabledInput.checked ? bgColorInput.value : null
+        };
+
+        // テキストの寸法を更新（既存のテキストで計算）
+        ctx.font = `${fontSize}px sans-serif`;
+        let maxWidth = 0;
+        textElement.lines.forEach(line => {
+            const metrics = ctx.measureText(line);
+            maxWidth = Math.max(maxWidth, metrics.width);
+        });
+
+        tempElement.width = maxWidth;
+        tempElement.height = tempElement.lineHeight * textElement.lines.length;
+
+        // 一時的な要素を使用してプレビュー表示
+        const originalElement = {...textElement};
+        Object.assign(textElement, tempElement);
+        updateCanvas();
+        // プレビュー後、テキスト関連のプロパティを元に戻す
+        textElement.text = originalElement.text;
+        textElement.lines = originalElement.lines;
+
+        updateCanvas();
+    }
+
+    // フォントサイズの変更を監視
+    fontSizeInput.addEventListener('input', () => {
+        fontSizeValue.textContent = fontSizeInput.value.padStart(3, '0');
+        updateTextElement();
+    });
+
+    // 文字色の変更を監視
+    textColorInput.addEventListener('input', updateTextElement);
+
+    // 背景色の変更を監視
+    bgColorInput.addEventListener('input', updateTextElement);
+
+    // 背景色の有効/無効の変更を監視
+    bgEnabledInput.addEventListener('change', updateTextElement);
+
     // デフォルト設定に戻すボタン
     const resetDefaultsBtn = document.getElementById('reset-defaults-btn');
     resetDefaultsBtn.addEventListener('click', () => {
         const fontSizeInput = document.getElementById('font-size-input');
         const textColor = document.getElementById('text-color');
         const bgColor = document.getElementById('bg-color');
+        const bgEnabled = document.getElementById('bg-enabled');
+        const fontSizeValue = document.getElementById('font-size-value');
         
         fontSizeInput.value = DEFAULT_FONT_SIZE;
+        fontSizeValue.textContent = DEFAULT_FONT_SIZE.toString().padStart(3, '0');
         textColor.value = DEFAULT_TEXT_COLOR;
         bgColor.value = DEFAULT_BG_COLOR;
+        bgEnabled.checked = DEFAULT_BG_ENABLED;
     });
 
     // テキスト適用ボタン
@@ -104,27 +174,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const fontSize = parseInt(fontSizeInput.value) || DEFAULT_FONT_SIZE;
         const textColor = document.getElementById('text-color').value;
         const bgColor = document.getElementById('bg-color').value;
+        const bgEnabled = document.getElementById('bg-enabled').checked;
         
         if (text) {
             if (editingTextId !== null) {
                 // 既存のテキストを編集
                 const textElement = textElements.find(el => el.id === editingTextId);
                 if (textElement) {
+                    // テキストの内容を更新
                     textElement.text = text;
                     textElement.color = textColor;
-                    textElement.bgColor = bgColor;
+                    textElement.bgColor = bgEnabled ? bgColor : null;
+                    textElement.fontSize = fontSize;
+                    textElement.lineHeight = fontSize * 1.2;
                     
-                    // 改行で分割
+                    // 改行で分割して各行の幅を計算
                     const lines = text.split('\n');
                     textElement.lines = lines;
                     
-                    // フォントサイズが変更された場合は幅と高さを再計算
-                    if (textElement.fontSize !== fontSize) {
-                        textElement.fontSize = fontSize;
-                        textElement.lineHeight = fontSize * 1.2;
-                    }
-                    
-                    // 各行の幅を計算して最大幅を取得
+                    // テキストの寸法を更新
                     ctx.font = `${fontSize}px sans-serif`;
                     let maxWidth = 0;
                     lines.forEach(line => {
@@ -165,17 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedTextElement = null;
                 updateCanvas();
             }
-        }
-    });
-
-    // 選択テキスト削除ボタン
-    deleteSelectedBtn.addEventListener('click', () => {
-        if (selectedTextElement) {
-            textElements = textElements.filter(el => el.id !== selectedTextElement.id);
-            selectedTextElement = null;
-            updateCanvas();
-        } else {
-            alert('削除するテキストを選択してください。');
         }
     });
 
@@ -220,38 +277,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 scaledY >= el.y &&
                 scaledY <= el.y + el.height
             ) {
+                // 現在のテキストが編集モードかチェック
+                const isCurrentlyEditing = editingTextId === el.id;
+
                 // ダブルクリックでテキスト編集
                 if (e.detail === 2 && el === selectedTextElement) {
                     editingTextId = el.id;
                     textInput.value = el.text;
                     const fontSizeInput = document.getElementById('font-size-input');
-                    fontSizeInput.value = el.fontSize;
                     const textColor = document.getElementById('text-color');
-                    textColor.value = el.color;
                     const bgColor = document.getElementById('bg-color');
+                    const bgEnabled = document.getElementById('bg-enabled');
+                    
+                    fontSizeInput.value = el.fontSize;
+                    fontSizeValue.textContent = el.fontSize.toString().padStart(3, '0');
+                    textColor.value = el.color;
                     bgColor.value = el.bgColor || DEFAULT_BG_COLOR;
+                    bgEnabled.checked = el.bgColor !== null;
                     textInput.focus();
-                    return;
                 }
 
-                // テキスト選択
-                selectedTextElement = el;
+                // 他のテキストを選択した場合は編集モードをクリア
+                if (editingTextId !== null && editingTextId !== el.id) {
+                    editingTextId = null;
+                    cancelTextInput();
+                }
+
+                // 選択状態を更新（編集中のテキスト以外の場合）
+                if (!isCurrentlyEditing) {
+                    selectedTextElement = el;
+                }
+
+                // ドラッグ開始（編集モード中でも移動可能）
                 isDragging = true;
                 dragOffsetX = scaledX - el.x;
                 dragOffsetY = scaledY - el.y;
-                found = true;
 
                 // 選択したテキストを配列の最後に移動（前面表示）
-                textElements = textElements.filter(item => item.id !== el.id);
-                textElements.push(el);
+                if (!isCurrentlyEditing) {
+                    textElements = textElements.filter(item => item.id !== el.id);
+                    textElements.push(el);
+                }
                 
+                found = true;
                 updateCanvas();
                 break;
             }
         }
 
         if (!found) {
+            // テキストの範囲外をクリックした場合
             selectedTextElement = null;
+            editingTextId = null;
+            cancelTextInput(); // テキスト入力欄をクリアして編集モードを解除
             updateCanvas();
         }
     });
@@ -288,6 +366,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // マウスがキャンバスから出た時
     canvas.addEventListener('mouseleave', () => {
         isDragging = false;
+    });
+
+    // デリートキーでテキスト削除
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete' && selectedTextElement) {
+            textElements = textElements.filter(el => el.id !== selectedTextElement.id);
+            selectedTextElement = null;
+            updateCanvas();
+        }
     });
 });
 
@@ -340,6 +427,7 @@ function addTextToCanvas(text) {
     const fontSize = parseInt(fontSizeInput.value) || DEFAULT_FONT_SIZE;
     const textColor = document.getElementById('text-color').value;
     const bgColor = document.getElementById('bg-color').value;
+    const bgEnabled = document.getElementById('bg-enabled').checked;
     
     // 改行で分割
     const lines = text.split('\n');
@@ -368,7 +456,7 @@ function addTextToCanvas(text) {
         fontSize: fontSize,
         lineHeight: lineHeight,
         color: textColor,
-        bgColor: bgColor
+        bgColor: bgEnabled ? bgColor : null
     };
     
     textElements.push(newText);
@@ -461,9 +549,19 @@ function drawImageAndTexts() {
         
         // 選択されたテキストに枠を表示
         if (selectedTextElement && el.id === selectedTextElement.id) {
-            ctx.strokeStyle = '#3498db';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(el.x - 2, el.y - 2, el.width + 4, el.height + 4);
+            if (editingTextId === el.id) {
+                // 編集モード時の枠のスタイル（オレンジ色の点線）
+                ctx.strokeStyle = '#ff9900';
+                ctx.setLineDash([5, 3]);
+                ctx.lineWidth = 2;
+                ctx.strokeRect(el.x - 4, el.y - 4, el.width + 8, el.height + 8);
+                ctx.setLineDash([]); // 点線をリセット
+            } else {
+                // 選択モード時の枠のスタイル（青色の実線）
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(el.x - 2, el.y - 2, el.width + 4, el.height + 4);
+            }
         }
     });
 }

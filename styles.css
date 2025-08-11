@@ -139,6 +139,23 @@ canvas {
     margin-top: 15px;
 }
 
+/* フォントサイズ表示のスタイル */
+.size-container {
+    display: inline-block;
+    min-width: 3.5em;
+    text-align: right;
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin: 0 4px;
+}
+
+#font-size-value {
+    font-family: monospace;
+    font-size: 14px;
+}
+
 #text-input {
     width: 100%;
     height: 100px;
